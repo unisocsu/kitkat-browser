@@ -52,13 +52,6 @@ public class MainActivity extends Activity {
         session.loadUri(url);
     }
 
-    @Override public void onBackPressed() {
-        if (session != null && session.getNavigationDelegate() != null) {
-            // GeckoView 70 does not expose a synchronous canGoBack check here; Android back closes this first prototype.
-        }
-        super.onBackPressed();
-    }
-
     @Override protected void onDestroy() {
         if (session != null) session.close();
         super.onDestroy();
