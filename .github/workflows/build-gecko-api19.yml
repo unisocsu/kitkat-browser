@@ -1,0 +1,64 @@
+name: Build experimental GeckoView API 19 APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'app/**'
+      - '*.gradle'
+      - 'gradle.properties'
+      - '.github/workflows/build-gecko-api19.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager 'platforms;android-29' 'build-tools;29.0.3'
+
+      - name: Install Gradle 5.4.1
+        run: |
+          curl --fail --location --retry 3 https://services.gradle.org/distributions/gradle-5.4.1-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-5.4.1/bin" >> "$GITHUB_PATH"
+
+      - name: Build APK
+        run: gradle --no-daemon --stacktrace assembleDebug
+
+      - name: Report APK details
+        if: always()
+        run: |
+          echo '## Build summary' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            ls -lh app/build/outputs/apk/debug/app-debug.apk | tee -a "$GITHUB_STEP_SUMMARY"
+            echo 'The APK was compiled only; it has not been runtime-tested on Android 4.4.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No APK was produced. See the build log for the dependency/toolchain error.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload APK and build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kitkat-browser-geckoview70-debug
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/aar/**
+          if-no-files-found: warn
+          retention-days: 14
