@@ -3,6 +3,8 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion 29
     buildToolsVersion '29.0.3'
+    // AGP 3.5.x needs the legacy NDK toolchain layout; newer NDKs removed it.
+    ndkVersion '21.4.7075529'
 
     defaultConfig {
         applicationId 'org.kitkatbrowser'
