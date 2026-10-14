@@ -1,0 +1,23 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 29
+    buildToolsVersion '29.0.3'
+
+    defaultConfig {
+        applicationId 'org.kitkatbrowser'
+        minSdkVersion 19
+        targetSdkVersion 28
+        versionCode 1
+        versionName '0.1.0-gecko70-experimental'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'org.mozilla.geckoview:geckoview-nightly:70.0.20190712095934'
+}
