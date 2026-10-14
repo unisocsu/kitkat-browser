@@ -59,6 +59,7 @@ jobs:
       - name: Create GitHub Release and upload files
         env:
           GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
           INPUT_TAG: ${{ inputs.tag }}
           RELEASE_NAME: ${{ inputs.release_name }}
           RUN_NUMBER: ${{ github.run_number }}
@@ -69,6 +70,7 @@ jobs:
             TAG="kitkat-browser-build-$RUN_NUMBER"
           fi
           gh release create "$TAG" release-assets/* \
+            --repo "$REPOSITORY" \
             --title "$RELEASE_NAME" \
             --notes "Published from Actions artifact ID 11926072622 (source run 38629946593)."
           echo "Release published: $TAG"
