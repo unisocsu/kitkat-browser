@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       gecko_ref:
-        description: "Mozilla gecko-dev tag or branch to inspect"
+        description: "Mozilla gecko-dev branch, tag, or commit to inspect"
         required: true
-        default: "FIREFOX_128_0_RELEASE"
+        default: "master"
 
 permissions:
   contents: read
@@ -20,28 +20,48 @@ jobs:
         env:
           GECKO_REF: ${{ inputs.gecko_ref }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           URL="https://raw.githubusercontent.com/mozilla/gecko-dev/${GECKO_REF}/mobile/android/geckoview/build.gradle"
           echo "Inspecting: ${URL}"
-          curl --fail --location --silent --show-error "${URL}" -o geckoview-build.gradle
-          echo
-          echo "=== Android SDK / NDK / toolchain references ==="
-          grep -nEi 'minSdk|min.sdk|compileSdk|targetSdk|ndkVersion|ndkVersion|abiFilters|desugar|kotlin' geckoview-build.gradle || true
-          echo
-          echo "=== Relevant Gradle configuration (first 240 lines) ==="
-          sed -n '1,240p' geckoview-build.gradle
-          echo
-          echo "=== API 19 preliminary assessment ==="
-          if grep -Eq 'minSdkVersion[[:space:]]+19|minSdk[[:space:]]*=[[:space:]]*19' geckoview-build.gradle; then
-            echo "The file appears to declare API 19. This is only a preliminary signal, not proof that native Gecko supports KitKat."
-          else
-            echo "No obvious API 19 minimum was found in this file. Inspect the full dependency/toolchain graph before attempting a build."
+          if ! curl --fail --location --silent --show-error "${URL}" -o geckoview-build.gradle; then
+            {
+              echo "GeckoView audit could not fetch the requested revision."
+              echo "Ref: ${GECKO_REF}"
+              echo "URL: ${URL}"
+              echo "Check that the ref exists in mozilla/gecko-dev."
+            } | tee audit-report.txt
+            exit 1
           fi
-      - name: Save audit report
+
+          {
+            echo "# GeckoView API 19 preliminary audit"
+            echo
+            echo "- Revision requested: ${GECKO_REF}"
+            echo "- Source: ${URL}"
+            echo
+            echo "## Android SDK / NDK / toolchain references"
+            grep -nEi 'minSdk|min.sdk|compileSdk|targetSdk|ndkVersion|abiFilters|desugar|kotlin' geckoview-build.gradle || true
+            echo
+            echo "## API 19 preliminary assessment"
+            if grep -Eq 'minSdkVersion[[:space:]]+19|minSdk[[:space:]]*=[[:space:]]*19' geckoview-build.gradle; then
+              echo "The file appears to declare API 19. This is only a preliminary signal, not proof that native Gecko supports KitKat."
+            else
+              echo "No obvious API 19 minimum was found in this file. This does not by itself prove API 19 is unsupported; inspect root Gradle configuration, manifest, dependencies, and native binaries."
+            fi
+            echo
+            echo "## First 240 lines of build.gradle"
+            echo '~~~gradle'
+            sed -n '1,240p' geckoview-build.gradle
+            echo '~~~'
+          } | tee audit-report.txt
+
+      - name: Upload audit report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gecko-api19-audit
-          path: geckoview-build.gradle
+          path: |
+            audit-report.txt
+            geckoview-build.gradle
           if-no-files-found: warn
           retention-days: 7
