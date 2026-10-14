@@ -26,17 +26,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # The runner already has Android command-line tools installed. Avoid
+      # setup-android@v3 here: it still requests the removed SDK package "tools".
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager 'platform-tools' 'platforms;android-29' 'build-tools;29.0.3'
 
       - name: Set up Java 8 for legacy Gradle
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '8'
-
-      - name: Install Android SDK packages
-        run: sdkmanager 'platforms;android-29' 'build-tools;29.0.3'
 
       - name: Install Gradle 5.4.1
         run: |
