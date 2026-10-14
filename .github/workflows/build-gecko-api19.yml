@@ -37,7 +37,7 @@ jobs:
           fi
           echo "Using $SDKMANAGER"
           yes | "$SDKMANAGER" --licenses
-          "$SDKMANAGER" 'platform-tools' 'platforms;android-29' 'build-tools;29.0.3'
+          "$SDKMANAGER" 'platform-tools' 'platforms;android-29' 'build-tools;29.0.3' 'ndk;21.4.7075529'
 
       - name: Set up Java 8 for legacy Gradle
         uses: actions/setup-java@v4
