@@ -28,29 +28,31 @@ jobs:
           ARTIFACT_ID: "11926072622"
         run: |
           set -euo pipefail
-          mkdir -p downloaded release-assets
-          gh api \
+          mkdir -p downloaded/content release-assets
+          curl --fail --location --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "/repos/$REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
-            > downloaded/artifact.zip
+            "https://api.github.com/repos/$REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
+            --output downloaded/artifact.zip
           if ! unzip -tq downloaded/artifact.zip >/dev/null; then
             echo "::error::The artifact download is not a valid ZIP. It may have expired or be inaccessible."
             exit 1
           fi
           unzip -q downloaded/artifact.zip -d downloaded/content
-          find downloaded/content -type f -exec cp --parents '{}' release-assets/ \;
-          # Flatten the artifact's internal directory structure when names are unique.
-          mkdir -p release-assets-flat
-          find downloaded/content -type f -print0 | while IFS= read -r -d '' file; do
-            cp "$file" "release-assets-flat/$(basename "$file")"
-          done
-          if [ -z "$(find release-assets-flat -maxdepth 1 -type f -print -quit)" ]; then
+          count=0
+          while IFS= read -r -d '' file; do
+            name="$(basename "$file")"
+            if [ -e "release-assets/$name" ]; then
+              echo "::error::Duplicate filename in artifact: $name"
+              exit 1
+            fi
+            cp "$file" "release-assets/$name"
+            count=$((count + 1))
+          done < <(find downloaded/content -type f -print0)
+          if [ "$count" -eq 0 ]; then
             echo "::error::The artifact contains no files."
             exit 1
           fi
-          # Use the flattened files as Release assets.
-          rm -rf release-assets
-          mv release-assets-flat release-assets
           echo "Files to publish:"
           find release-assets -maxdepth 1 -type f -printf '%f (%s bytes)\n'
 
@@ -68,6 +70,5 @@ jobs:
           fi
           gh release create "$TAG" release-assets/* \
             --title "$RELEASE_NAME" \
-            --notes "Published from Actions artifact ID 11926072622 (source run 38629946593)." \
-            --verify-tag=false
+            --notes "Published from Actions artifact ID 11926072622 (source run 38629946593)."
           echo "Release published: $TAG"
