@@ -50,7 +50,9 @@ jobs:
           python-version: '3.11'
 
       - name: Install Kaggle CLI
-        run: pip install --quiet kaggle
+        run: |
+          pip install --quiet kaggle six
+          kaggle --version
 
       - name: Check secrets are set
         env:
