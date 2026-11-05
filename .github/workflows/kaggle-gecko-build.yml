@@ -4,8 +4,8 @@ name: Kaggle Gecko API 19 build
 # downloads the logs and any build output as a workflow artifact.
 #
 # Repository secrets (Settings > Secrets and variables > Actions):
-#   KAGGLE_USERNAME   your Kaggle username   (the old name KAGLE_USER_NAME also works)
-#   KAGGLE_KEY        your Kaggle API key    (the old name KAGLE_KEY also works)
+#   KAGLE_USER_NAME   your Kaggle username   (the spelling KAGGLE_USERNAME also works)
+#   KAGLE_KEY         your Kaggle API key    (the spelling KAGGLE_KEY also works)
 
 on:
   workflow_dispatch:
@@ -54,18 +54,18 @@ jobs:
 
       - name: Check secrets are set
         env:
-          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || secrets.KAGLE_USER_NAME }}
-          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY || secrets.KAGLE_KEY }}
+          KAGGLE_USERNAME: ${{ secrets.KAGLE_USER_NAME || secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGLE_KEY || secrets.KAGGLE_KEY }}
         run: |
           if [ -z "$KAGGLE_USERNAME" ] || [ -z "$KAGGLE_KEY" ]; then
-            echo "::error::Missing secrets. Add KAGGLE_USERNAME and KAGGLE_KEY (or KAGLE_USER_NAME and KAGLE_KEY) in the repository settings."
+            echo "::error::Missing secrets. Add KAGLE_USER_NAME and KAGLE_KEY (or KAGGLE_USERNAME and KAGGLE_KEY) in the repository settings."
             exit 1
           fi
           echo "Kaggle credentials found."
 
       - name: Prepare kernel folder
         env:
-          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || secrets.KAGLE_USER_NAME }}
+          KAGGLE_USERNAME: ${{ secrets.KAGLE_USER_NAME || secrets.KAGGLE_USERNAME }}
           STAGE: ${{ inputs.stage }}
         run: |
           set -euo pipefail
@@ -78,8 +78,8 @@ jobs:
       - name: Push kernel to Kaggle
         if: ${{ inputs.action == 'push-and-wait' }}
         env:
-          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || secrets.KAGLE_USER_NAME }}
-          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY || secrets.KAGLE_KEY }}
+          KAGGLE_USERNAME: ${{ secrets.KAGLE_USER_NAME || secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGLE_KEY || secrets.KAGGLE_KEY }}
         run: |
           set -euo pipefail
           kaggle kernels push -p build/kernel
@@ -87,8 +87,8 @@ jobs:
       - name: Wait for the Kaggle run
         if: ${{ inputs.action == 'push-and-wait' }}
         env:
-          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || secrets.KAGLE_USER_NAME }}
-          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY || secrets.KAGLE_KEY }}
+          KAGGLE_USERNAME: ${{ secrets.KAGLE_USER_NAME || secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGLE_KEY || secrets.KAGGLE_KEY }}
           WAIT_MINUTES: ${{ inputs.wait_minutes }}
         run: |
           set -uo pipefail
@@ -112,8 +112,8 @@ jobs:
       - name: Download output
         if: ${{ always() }}
         env:
-          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || secrets.KAGLE_USER_NAME }}
-          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY || secrets.KAGLE_KEY }}
+          KAGGLE_USERNAME: ${{ secrets.KAGLE_USER_NAME || secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGLE_KEY || secrets.KAGGLE_KEY }}
         run: |
           kaggle kernels output "$KERNEL_ID" -p build/output || echo "No output available yet."
           ls -lah build/output || true
