@@ -1,0 +1,5 @@
+[submodule "gecko"]
+	path = gecko
+	url = https://github.com/mozilla/gecko-dev.git
+	branch = esr115
+	shallow = true
