@@ -1,0 +1,146 @@
+name: Kaggle Gecko API 19 build
+
+# Pushes kaggle/build_gecko.py to Kaggle as a private kernel, waits for it, and
+# downloads the logs and any build output as a workflow artifact.
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   KAGGLE_USERNAME   your Kaggle username   (the old name KAGLE_USER_NAME also works)
+#   KAGGLE_KEY        your Kaggle API key    (the old name KAGLE_KEY also works)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'push-and-wait starts a new Kaggle run; fetch-output only downloads the latest output'
+        type: choice
+        options:
+          - push-and-wait
+          - fetch-output
+        default: push-and-wait
+      stage:
+        description: 'configure = quick check; build = full compile (hours)'
+        type: choice
+        options:
+          - configure
+          - build
+        default: configure
+      wait_minutes:
+        description: 'How long this job waits for Kaggle (max 340)'
+        type: string
+        default: '340'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kaggle-gecko-build
+  cancel-in-progress: false
+
+jobs:
+  kaggle:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Kaggle CLI
+        run: pip install --quiet kaggle
+
+      - name: Check secrets are set
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || secrets.KAGLE_USER_NAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY || secrets.KAGLE_KEY }}
+        run: |
+          if [ -z "$KAGGLE_USERNAME" ] || [ -z "$KAGGLE_KEY" ]; then
+            echo "::error::Missing secrets. Add KAGGLE_USERNAME and KAGGLE_KEY (or KAGLE_USER_NAME and KAGLE_KEY) in the repository settings."
+            exit 1
+          fi
+          echo "Kaggle credentials found."
+
+      - name: Prepare kernel folder
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || secrets.KAGLE_USER_NAME }}
+          STAGE: ${{ inputs.stage }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/kernel build/output
+          sed "s/__STAGE__/${STAGE}/" kaggle/build_gecko.py > build/kernel/build_gecko.py
+          USERNAME_LC="$(printf '%s' "$KAGGLE_USERNAME" | tr '[:upper:]' '[:lower:]')"
+          sed "s/__USERNAME__/${USERNAME_LC}/" kaggle/kernel-metadata.template.json > build/kernel/kernel-metadata.json
+          echo "KERNEL_ID=${USERNAME_LC}/gecko-api19-build" >> "$GITHUB_ENV"
+
+      - name: Push kernel to Kaggle
+        if: ${{ inputs.action == 'push-and-wait' }}
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || secrets.KAGLE_USER_NAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY || secrets.KAGLE_KEY }}
+        run: |
+          set -euo pipefail
+          kaggle kernels push -p build/kernel
+
+      - name: Wait for the Kaggle run
+        if: ${{ inputs.action == 'push-and-wait' }}
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || secrets.KAGLE_USER_NAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY || secrets.KAGLE_KEY }}
+          WAIT_MINUTES: ${{ inputs.wait_minutes }}
+        run: |
+          set -uo pipefail
+          MAX="${WAIT_MINUTES:-340}"
+          if [ "$MAX" -gt 340 ]; then MAX=340; fi
+          # Give Kaggle a moment to register the new version before polling.
+          sleep 30
+          for i in $(seq 1 "$MAX"); do
+            OUT="$(kaggle kernels status "$KERNEL_ID" 2>&1 || true)"
+            STATE="$(printf '%s' "$OUT" | grep -oE 'COMPLETE|ERROR|CANCEL[A-Z_]*|RUNNING|QUEUED|NEW' | head -n 1 || true)"
+            echo "[$i/$MAX min] ${STATE:-unknown}"
+            case "$STATE" in
+              COMPLETE) echo "KAGGLE_FINAL=COMPLETE" >> "$GITHUB_ENV"; exit 0 ;;
+              ERROR|CANCEL*) echo "KAGGLE_FINAL=$STATE" >> "$GITHUB_ENV"; exit 0 ;;
+            esac
+            sleep 60
+          done
+          echo "KAGGLE_FINAL=STILL_RUNNING" >> "$GITHUB_ENV"
+          echo "::warning::Kaggle is still running. Re-run this workflow with action=fetch-output later."
+
+      - name: Download output
+        if: ${{ always() }}
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME || secrets.KAGLE_USER_NAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY || secrets.KAGLE_KEY }}
+        run: |
+          kaggle kernels output "$KERNEL_ID" -p build/output || echo "No output available yet."
+          ls -lah build/output || true
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo '## Kaggle Gecko build'
+            echo "Kernel: \`${KERNEL_ID:-unknown}\`"
+            echo "Final Kaggle state: \`${KAGGLE_FINAL:-n/a}\`"
+            if [ -f build/output/summary.txt ]; then
+              echo '```'
+              cat build/output/summary.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload logs and output
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: kaggle-gecko-output
+          path: |
+            build/output/logs/**
+            build/output/out/**
+            build/output/summary.txt
+            build/output/*.log
+          if-no-files-found: warn
+          retention-days: 14
