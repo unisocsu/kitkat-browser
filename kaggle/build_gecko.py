@@ -15,7 +15,7 @@ import traceback
 STAGE = "__STAGE__"  # configure | build
 
 REPO = "https://github.com/unisocsu/kitkat-browser"
-BRANCH = "gecko-esr115-import"
+BRANCH = "main"
 
 WORK = pathlib.Path("/kaggle/working")
 LOGS = WORK / "logs"
